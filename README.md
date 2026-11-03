@@ -105,7 +105,7 @@ app/main.py       API
 app/static/       前端
 vendor/RapidOCR   OCR 原始碼（git clone）
 data/             資料庫、圖片、JSON（備份這個資料夾即可）
-samples/          測試名片
+samples/          測試名片（不進版控；python tools/make_samples.py 可產生合成名片）
 ```
 
 ## 已知限制

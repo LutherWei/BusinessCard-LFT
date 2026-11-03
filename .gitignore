@@ -14,5 +14,5 @@ data/
 batch_output/
 output_json/
 tests/ground_truth*.json
-samples/replica_*.jpg
+samples/
 tools/make_replica.py
