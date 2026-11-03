@@ -1,0 +1,10 @@
+# OCR：RapidOCR 原始碼（run.sh 會自動 clone 到 vendor/RapidOCR）
+./vendor/RapidOCR/python
+onnxruntime
+fastapi
+uvicorn[standard]
+python-multipart
+pillow-heif
+# 測試 / 評估用
+pytest
+opencc-python-reimplemented

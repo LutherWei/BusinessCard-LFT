@@ -1,0 +1,18 @@
+# 環境
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.claude/
+.ipynb_checkpoints/
+
+# OCR 原始碼另外 clone（見 README）
+vendor/
+
+# 真實名片資料：照片、資料庫、匯出結果、人工標註正解 —— 含個資，不進版控
+data/
+batch_output/
+output_json/
+tests/ground_truth*.json
+samples/replica_*.jpg
+tools/make_replica.py

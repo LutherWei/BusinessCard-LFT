@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>名片管理系統</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--text:#1d2129;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--accent-soft:#e8efff;--danger:#dc2626;--chip:#f1f3f6;
+  --s5:#15803d;--s5-bg:#dcfce7;--s4:#3f7d20;--s4-bg:#ecfccb;--s3:#b45309;--s3-bg:#fef3c7;--s2:#9a3412;--s2-bg:#ffedd5;--s1:#6b7280;--s1-bg:#eceef1}
+@media (prefers-color-scheme:dark){:root{--bg:#111318;--panel:#1a1d24;--text:#e7e9ee;--muted:#9aa1ad;--line:#2b2f38;--accent:#6b9bff;--accent-soft:#1f2a44;--danger:#f87171;--chip:#242833;
+  --s5:#4ade80;--s5-bg:#14301f;--s4:#a3e635;--s4-bg:#24300f;--s3:#fbbf24;--s3-bg:#3a2e10;--s2:#fb923c;--s2-bg:#3a2210;--s1:#a1a8b3;--s1-bg:#2a2e37}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+h1{font-size:17px;margin:0 8px 0 0;white-space:nowrap}
+.tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.tools input,.tools select{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--text);font:inherit;font-size:12.5px}
+.card .d{font-size:11px;color:var(--muted);margin-top:2px}
+#q{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px}
+button,.btn{border:1px solid var(--line);background:var(--panel);color:var(--text);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;text-decoration:none;white-space:nowrap;font-family:inherit}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.danger{color:var(--danger)}
+main{display:grid;grid-template-columns:220px 1fr;gap:16px;padding:16px 20px;max-width:1400px;margin:0 auto}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;align-self:start;position:sticky;top:76px}
+aside h3{margin:0 0 8px;font-size:12px;color:var(--muted);font-weight:600}
+aside h3+div{margin-bottom:14px}
+.co{display:flex;justify-content:space-between;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px;gap:8px}
+.co:hover{background:var(--chip)}.co.on{background:var(--accent-soft);color:var(--accent)}
+.co span:last-child{color:var(--muted)}
+/* 上傳：正面 / 反面 */
+.up{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px}
+.zones{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.zone{border:2px dashed var(--line);border-radius:10px;padding:14px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s;min-height:110px;display:flex;flex-direction:column;gap:8px;justify-content:center}
+.zone.over{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.zone b{color:var(--text);font-size:14px}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.thumbs div{position:relative}
+.thumbs img{width:76px;height:48px;object-fit:cover;border-radius:5px;border:1px solid var(--line)}
+.thumbs span{position:absolute;left:3px;top:2px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;border-radius:3px;padding:0 4px}
+.thumbs i{position:absolute;right:-6px;top:-6px;width:18px;height:18px;border-radius:50%;background:var(--danger);color:#fff;font:12px/18px sans-serif;font-style:normal;cursor:pointer}
+.upbar{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
+#status{font-size:13px;color:var(--muted);flex:1}
+.mode{display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.mode button{padding:5px 12px;flex:0 0 auto;width:auto}.mode button.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.mode .opt{display:none;gap:6px;align-items:center;margin-left:8px}
+.mode.is-sheet .opt{display:flex}
+.mode input[type=number]{width:52px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)}
+.layout{font:12px/1.25 ui-monospace,Menlo,monospace;color:var(--muted);white-space:pre;margin-top:4px}
+#previews{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+#previews figure{margin:0;font-size:12px;color:var(--muted)}#previews img{height:220px;border-radius:6px;border:1px solid var(--line);display:block}
+/* 名片列表 */
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;cursor:pointer;display:flex;gap:12px;transition:.12s;position:relative}
+.card:hover{border-color:var(--accent);box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.card .pics{flex:none;display:flex;flex-direction:column;gap:4px}
+.card img{width:96px;height:60px;object-fit:cover;border-radius:6px;background:var(--chip)}
+.card img.b{height:30px;opacity:.85}
+.card .n{font-weight:600;font-size:15px;padding-right:44px}.card .n small{font-weight:400;color:var(--muted);margin-left:6px}
+.card .t,.card .c,.card .m{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .c{color:var(--text)}
+.card>div:last-child{min-width:0}
+.badge{font-size:11.5px;padding:1px 8px;border-radius:10px;white-space:nowrap;font-weight:600}
+.card .badge{position:absolute;right:12px;top:12px}
+.p-1{color:var(--s1);background:var(--s1-bg)}.p-2{color:var(--s2);background:var(--s2-bg)}.p-3{color:var(--s3);background:var(--s3-bg)}.p-4{color:var(--s4);background:var(--s4-bg)}.p-5{color:var(--s5);background:var(--s5-bg)}
+.p-{color:var(--muted);background:transparent;border:1px dashed var(--line);font-weight:400}
+mark{background:#fde68a;color:#1d2129;border-radius:2px}
+.empty{color:var(--muted);text-align:center;padding:40px}
+/* 詳細 */
+#dlg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;z-index:20;overflow:auto;padding:30px 16px}
+#dlg.on{display:flex}
+.sheet{background:var(--panel);border-radius:12px;max-width:1000px;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px}
+.sheet img{width:100%;border-radius:8px;border:1px solid var(--line)}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tabs button{padding:5px 12px}.tabs button.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.raw{font-size:12px;color:var(--muted);background:var(--chip);border-radius:8px;padding:8px 10px;margin-top:10px;max-height:220px;overflow:auto;white-space:pre-wrap}
+.form{display:grid;grid-template-columns:90px 1fr;gap:6px 10px;align-items:center}
+.form label{font-size:12px;color:var(--muted);text-align:right}
+.form input,.form textarea{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font:inherit;font-size:13px}
+.form textarea{resize:vertical;min-height:50px}
+.seg{display:flex;gap:6px}
+.seg button{padding:5px 14px;flex:1}
+.seg button.on.p-1{border-color:var(--s1)}.seg button.on.p-2{border-color:var(--s2)}.seg button.on.p-3{border-color:var(--s3)}.seg button.on.p-4{border-color:var(--s4)}.seg button.on.p-5{border-color:var(--s5)}
+.seg button:not(.on){background:var(--panel);color:var(--muted);border:1px solid var(--line);font-weight:400}
+.seg button.on.p-{border:1px solid var(--accent);color:var(--accent)}
+.acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.hint{font-size:11.5px;color:var(--muted);grid-column:2}
+@media (max-width:760px){main{grid-template-columns:1fr;padding:12px 16px}aside{position:static}.sheet{grid-template-columns:1fr}header{padding:12px 16px}.zones{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>📇 名片管理</h1>
+  <input id="q" placeholder="搜尋姓名、公司、職稱、電話、Email、地址、標籤…（空白分隔多關鍵字）" autocomplete="off">
+  <div class="tools">上傳日期
+    <input type="date" id="dfrom" aria-label="上傳日期起">～<input type="date" id="dto" aria-label="上傳日期迄">
+    <select id="sort" aria-label="排序"><option value="new">最新上傳</option><option value="old">最早上傳</option><option value="potential">合作可能性高→低</option></select>
+  </div>
+  <a class="btn" id="exportAll" href="/api/export.json">匯出 JSON</a>
+</header>
+<main>
+  <aside>
+    <h3>合作可能性</h3>
+    <div id="pots"></div>
+    <h3>公司</h3>
+    <div id="cos"></div>
+  </aside>
+  <section>
+    <div class="up">
+      <div class="mode" id="mode">上傳方式
+        <button class="on" data-m="single">一張一張</button><button data-m="sheet">整頁（一張照片多張名片）</button>
+        <span class="opt">每頁 <input type="number" id="rows" value="4" min="1" max="8"> 列 × <input type="number" id="cols" value="2" min="1" max="6"> 欄
+          <label><input type="checkbox" id="mirror"> 反面左右對調</label></span>
+      </div>
+      <div class="zones">
+        <div class="zone" data-side="front"><b>正面</b><span>拖曳或點擊選擇（可多張）</span><div class="thumbs"></div></div>
+        <div class="zone" data-side="back"><b>反面（選填）</b><span>依順序與正面配對：正面 1 ↔ 反面 1</span><div class="thumbs"></div></div>
+      </div>
+      <input type="file" id="file" accept="image/*,.heic" multiple hidden>
+      <div class="upbar"><span id="status"></span>
+        <button id="clear">清除</button><button class="primary" id="go" disabled>開始辨識</button></div>
+      <div id="previews"></div>
+    </div>
+    <div id="grid"></div>
+  </section>
+</main>
+<div id="dlg"><div class="sheet" id="sheet"></div></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// 合作可能性 1~5 分；"" = 未評估
+const POTS = [["5","5 分"],["4","4 分"],["3","3 分"],["2","2 分"],["1","1 分"],["","未評估"]];
+const SEG = [["1","1"],["2","2"],["3","3"],["4","4"],["5","5"],["","未評估"]];
+let company = "", potential = null, timer;
+// 依重要性排列：姓名 → 單位 → Email → 電話 → 職稱 / 部門 → 地址 → 其他
+const FIELDS = [["name","姓名"],["name_en","英文名"],["company","公司"],["company_en","英文公司"],
+  ["email","Email",1],["mobile","手機",1],["phone","電話",1],
+  ["title","職稱"],["title_en","英文職稱"],["department","部門"],["department_en","英文部門"],
+  ["address","地址"],["address_en","英文地址"],["fax","傳真",1],["website","網站",1],
+  ["tax_id","統一編號"],["line_id","LINE"],["wechat","WeChat"],["other","其他",1]];
+const fmtDate = s => (s||"").replace("T"," ").slice(0,16);
+const badge = p => `<span class="badge p-${esc(p)}" title="合作可能性">${p ? "★ " + esc(p) : "未評估"}</span>`;
+
+function hl(text){
+  const kws = $("#q").value.trim().split(/\s+/).filter(Boolean);
+  let s = esc(text);
+  for (const k of kws) s = s.replace(new RegExp(esc(k).replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"gi"), m => `<mark>${m}</mark>`);
+  return s;
+}
+async function load(){
+  const p = new URLSearchParams({q: $("#q").value.trim(), company, date_from: $("#dfrom").value, date_to: $("#dto").value, sort: $("#sort").value});
+  if (potential !== null) p.set("potential", potential);
+  const [cards, cos, pots] = await Promise.all([fetch("/api/cards?"+p).then(r=>r.json()),
+    fetch("/api/companies").then(r=>r.json()), fetch("/api/potentials").then(r=>r.json())]);
+  $("#exportAll").href = "/api/export.json?"+p;
+  const total = Object.values(pots).reduce((a,b)=>a+b,0);
+  $("#pots").innerHTML = `<div class="co ${potential===null?"on":""}" data-p="*"><span>全部</span><span>${total}</span></div>` +
+    POTS.map(([v,l])=>`<div class="co ${potential===v?"on":""}" data-p="${v}"><span><span class="badge p-${v}">${l}</span></span><span>${pots[v]||0}</span></div>`).join("");
+  $("#cos").innerHTML = `<div class="co ${company?"":"on"}" data-c=""><span>全部</span><span>${cos.reduce((a,b)=>a+b.n,0)}</span></div>` +
+    cos.map(c=>`<div class="co ${c.company===company?"on":""}" data-c="${esc(c.company)}"><span>${esc(c.company)}</span><span>${c.n}</span></div>`).join("");
+  $("#grid").innerHTML = cards.length ? cards.map(c=>{const d=c.data; return `
+    <div class="card" data-id="${c.id}">
+      ${badge(c.potential)}
+      <div class="pics"><img src="/images/${esc(c.card_image)}" loading="lazy" alt="">${c.back_card_image?`<img class="b" src="/images/${esc(c.back_card_image)}" loading="lazy" alt="" title="反面">`:""}</div>
+      <div>
+        <div class="n">${hl(d.name||d.name_en||"（未辨識姓名）")}${d.name&&d.name_en?`<small>${hl(d.name_en)}</small>`:""}</div>
+        <div class="t">${hl([d.department,d.title||d.title_en].filter(Boolean).join(" · "))}</div>
+        <div class="c">${hl(d.company||d.company_en)}</div>
+        <div class="m">${hl([...(d.mobile||[]),...(d.phone||[])].slice(0,2).join("　"))}</div>
+        <div class="m">${hl((d.email||[])[0]||"")}</div>
+        <div class="d">上傳 ${esc(fmtDate(c.created_at))}</div>
+      </div></div>`}).join("") : `<div class="empty">沒有符合的名片</div>`;
+}
+$("#q").addEventListener("input", ()=>{clearTimeout(timer); timer=setTimeout(load,200)});
+["#dfrom","#dto","#sort"].forEach(s=>$(s).addEventListener("change", load));
+$("#cos").addEventListener("click", e=>{const el=e.target.closest(".co"); if(el){company=el.dataset.c; load()}});
+$("#pots").addEventListener("click", e=>{const el=e.target.closest(".co"); if(el){potential=el.dataset.p==="*"?null:el.dataset.p; load()}});
+$("#grid").addEventListener("click", e=>{const el=e.target.closest(".card"); if(el) open(el.dataset.id)});
+
+// ---- 上傳：正面 / 反面 ----
+const picked = {front: [], back: []};
+let pickSide = "front", mode = "single";
+const ZONE_TXT = {
+  single: [["正面","拖曳或點擊選擇（可多張）"],["反面（選填）","依順序與正面配對：正面 1 ↔ 反面 1"]],
+  sheet: [["正面整頁照片","每張照片排好多張名片的正面（可多張照片）"],["反面整頁照片（選填）","翻面後同位置拍：A ↔ A'、B ↔ B'…"]],
+};
+function layoutHint(){
+  const r=+$("#rows").value||4, c=+$("#cols").value||2, L="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let s=""; for(let i=0;i<r;i++){ s+=[...Array(c)].map((_,j)=>L[i*c+j]||"?").join(" ")+"\n"; } return s;
+}
+function setMode(m){
+  mode=m; $("#mode").classList.toggle("is-sheet", m==="sheet");
+  document.querySelectorAll("#mode button").forEach(b=>b.classList.toggle("on", b.dataset.m===m));
+  document.querySelectorAll(".zone").forEach((z,i)=>{ z.querySelector("b").textContent=ZONE_TXT[m][i][0];
+    z.querySelector("span").innerHTML=esc(ZONE_TXT[m][i][1]) + (m==="sheet"?`<div class="layout">${esc(layoutHint())}</div>`:""); });
+  renderPicked();
+}
+$("#mode").addEventListener("click", e=>{ const b=e.target.closest("button"); if(b) setMode(b.dataset.m); });
+["#rows","#cols"].forEach(s=>$(s).addEventListener("input", ()=>setMode(mode)));
+function renderPicked(){
+  for (const side of ["front","back"]) {
+    document.querySelector(`.zone[data-side=${side}] .thumbs`).innerHTML = picked[side].map((f,i)=>
+      `<div><img src="${f.url}" alt=""><span>${i+1}</span><i data-side="${side}" data-i="${i}">×</i></div>`).join("");
+  }
+  const nf = picked.front.length, nb = picked.back.length;
+  $("#go").disabled = !nf;
+  const unit = mode==="sheet" ? "張整頁照片" : "張名片";
+  $("#status").textContent = !nf && !nb ? "" :
+    nb > nf ? `⚠ 反面 ${nb} 張多於正面 ${nf} 張，多出的反面會被忽略` :
+    `共 ${nf} ${unit}` + (nb ? `，其中 ${nb} 張有反面` : "") +
+    (mode==="sheet" ? `（最多 ${nf*(+$("#rows").value||4)*(+$("#cols").value||2)} 張名片）` : "");
+}
+function addFiles(side, files){
+  for (const f of files) if (f.type.startsWith("image/") || /\.heic$/i.test(f.name))
+    picked[side].push({file: f, url: URL.createObjectURL(f)});
+  renderPicked();
+}
+document.querySelectorAll(".zone").forEach(z=>{
+  const side = z.dataset.side;
+  z.addEventListener("click", e=>{
+    if (e.target.tagName==="I"){ e.stopPropagation(); picked[e.target.dataset.side].splice(+e.target.dataset.i,1); renderPicked(); return; }
+    pickSide = side; $("#file").click();
+  });
+  ["dragenter","dragover"].forEach(t=>z.addEventListener(t,e=>{e.preventDefault();z.classList.add("over")}));
+  ["dragleave","drop"].forEach(t=>z.addEventListener(t,e=>{e.preventDefault();z.classList.remove("over")}));
+  z.addEventListener("drop", e=>addFiles(side, e.dataTransfer.files));
+});
+$("#file").onchange = e=>{ addFiles(pickSide, e.target.files); e.target.value=""; };
+$("#clear").onclick = ()=>{ picked.front=[]; picked.back=[]; renderPicked(); };
+$("#go").onclick = async ()=>{
+  if (mode==="sheet") return goSheet();
+  const fd = new FormData();
+  picked.front.forEach(p=>fd.append("front", p.file));
+  picked.back.slice(0, picked.front.length).forEach(p=>fd.append("back", p.file));
+  const n = picked.front.length;
+  $("#go").disabled = true;
+  $("#status").textContent = `辨識中…（${n} 張名片，每面約 1–3 秒）`;
+  try {
+    const res = await fetch("/api/cards",{method:"POST",body:fd}).then(r=>r.json());
+    const ok = res.filter(r=>!r.error), bad = res.filter(r=>r.error);
+    picked.front=[]; picked.back=[]; renderPicked();
+    $("#status").textContent = `完成 ${ok.length} 張` + (bad.length?`，失敗 ${bad.length} 張：${bad.map(b=>b.filename+" "+b.error).join("; ")}`:"");
+    await load();
+    if (ok.length===1) open(ok[0].id);
+  } catch(err){ $("#status").textContent = "上傳失敗：" + err; $("#go").disabled = false; }
+};
+
+async function goSheet(){
+  const fd = new FormData();
+  picked.front.forEach(p=>fd.append("front", p.file));
+  picked.back.slice(0, picked.front.length).forEach(p=>fd.append("back", p.file));
+  fd.append("rows", $("#rows").value); fd.append("cols", $("#cols").value); fd.append("mirror", $("#mirror").checked);
+  const per = (+$("#rows").value||4)*(+$("#cols").value||2);
+  $("#go").disabled = true; $("#previews").innerHTML = "";
+  $("#status").textContent = `切割並辨識中…（${picked.front.length} 組整頁照片，最多 ${picked.front.length*per} 張名片，每張約 5–10 秒）`;
+  try {
+    const res = await fetch("/api/sheets",{method:"POST",body:fd}).then(r=>r.json());
+    const cards = res.flatMap(s=>s.cards||[]), ok = cards.filter(c=>!c.error), bad = cards.filter(c=>c.error);
+    const sheetErr = res.filter(s=>s.error);
+    picked.front=[]; picked.back=[]; renderPicked();
+    $("#status").textContent = `完成 ${ok.length} 張名片` + (bad.length?`，失敗 ${bad.length} 張（${bad.map(c=>c.position).join("、")}）`:"")
+      + (sheetErr.length?`；${sheetErr.length} 張整頁照片無法處理：${sheetErr.map(s=>s.sheet+" "+s.error).join("; ")}`:"")
+      + "。請看下方切割預覽確認位置有沒有對上。";
+    $("#previews").innerHTML = res.map((s,i)=>Object.entries(s.previews||{}).map(([side,url])=>
+      `<figure><img src="${esc(url)}" alt=""><figcaption>第 ${i+1} 組 ${side==="front"?"正面":"反面"}：${esc(s.sheet||"")}</figcaption></figure>`).join("")).join("");
+    await load();
+  } catch(err){ $("#status").textContent = "上傳失敗：" + err; $("#go").disabled = false; }
+}
+
+// ---- 詳細 / 編輯 ----
+async function open(id){
+  const c=await fetch("/api/cards/"+id).then(r=>r.json()), d=c.data;
+  let pot = c.potential || "";
+  const hasBack = !!c.back_card_image;
+  $("#sheet").innerHTML=`
+    <div>
+      <div class="tabs"><button class="on" data-v="front">正面</button>${hasBack?`<button data-v="back">反面</button>`:""}
+        <button id="addBack" style="margin-left:auto">${hasBack?"更換反面":"＋ 補上反面"}</button><input type="file" id="backFile" accept="image/*,.heic" hidden></div>
+      <div id="view"></div>
+    </div>
+    <div><form class="form" id="f" onsubmit="return false">
+      <label>合作可能性<br><small>1 低 ~ 5 高</small></label><div class="seg" id="seg">${SEG.map(([v,l])=>`<button type="button" class="badge p-${v} ${pot===v?"on":""}" data-v="${v}">${l}</button>`).join("")}</div>
+      ${FIELDS.map(([k,l,isList])=>`<label>${l}</label><input name="${k}" value="${esc(isList?(d[k]||[]).join(", "):d[k])}">`).join("")}
+      <span class="hint">多筆以逗號分隔</span>
+      <label>標籤</label><input name="__tags" value="${esc(c.tags)}" placeholder="例：客戶, 2026展會">
+      <label>備註</label><textarea name="__note">${esc(c.note)}</textarea>
+      <label>上傳日期</label><div style="font-size:13px">${esc(fmtDate(c.created_at))}${c.updated_at!==c.created_at?`<span style="color:var(--muted)">（最後修改 ${esc(fmtDate(c.updated_at))}）</span>`:""}</div>
+    </form>
+    <div class="acts"><button class="primary" id="save">儲存</button><a class="btn" href="/api/cards/${id}/json">下載 JSON</a>
+      <button id="reparse" title="用最新的 OCR 與解析規則，從原始照片重新辨識；手動修改過的欄位會被覆蓋">依最新規則重新解析</button>
+      <button class="danger" id="del">刪除</button><button id="close" style="margin-left:auto">關閉</button></div></div>`;
+  const side = v => {
+    const [img, orig, raw] = v==="back" ? [c.back_card_image, c.back_image, c.back_raw] : [c.card_image, c.image, c.raw];
+    $("#view").innerHTML = `<img src="/images/${esc(img)}" alt="">
+      <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted);font-size:12px">原始照片</summary><img src="/images/${esc(orig)}" alt="" style="margin-top:6px"></details>
+      <div class="raw"><b>OCR 原始文字（${v==="back"?"反面":"正面"}）</b>\n${raw.map(r=>esc(r.text)).join("\n")}</div>`;
+    document.querySelectorAll(".tabs button[data-v]").forEach(b=>b.classList.toggle("on", b.dataset.v===v));
+  };
+  side("front");
+  document.querySelectorAll(".tabs button[data-v]").forEach(b=>b.onclick=()=>side(b.dataset.v));
+  $("#seg").onclick = e=>{ const b=e.target.closest("button"); if(!b) return; pot=b.dataset.v;
+    document.querySelectorAll("#seg button").forEach(x=>x.classList.toggle("on", x===b)); };
+  $("#addBack").onclick = ()=>$("#backFile").click();
+  $("#backFile").onchange = async e=>{
+    const f=e.target.files[0]; if(!f) return;
+    $("#addBack").disabled=true; $("#addBack").textContent="辨識中…";
+    const fd=new FormData(); fd.append("file", f);
+    await fetch(`/api/cards/${id}/back`,{method:"POST",body:fd});
+    await load(); open(id);
+  };
+  $("#dlg").classList.add("on");
+  $("#close").onclick=closeDlg;
+  $("#reparse").onclick=async()=>{
+    if(!confirm("用最新規則從原始照片重新辨識？手動改過的欄位會被覆蓋（標籤、備註、合作可能性會保留）。")) return;
+    $("#reparse").disabled=true; $("#reparse").textContent="辨識中…";
+    await fetch(`/api/cards/${id}/reparse`,{method:"POST"}); await load(); open(id);
+  };
+  $("#del").onclick=async()=>{if(confirm("確定刪除這張名片？")){await fetch("/api/cards/"+id,{method:"DELETE"});closeDlg();load()}};
+  $("#save").onclick=async()=>{
+    const data={}; let tags="",note="";
+    for(const el of $("#f").elements){ if(el.name==="__tags")tags=el.value; else if(el.name==="__note")note=el.value; else if(el.name) data[el.name]=el.value; }
+    await fetch("/api/cards/"+id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({data,tags,note,potential:pot})});
+    closeDlg(); load();
+  };
+}
+function closeDlg(){$("#dlg").classList.remove("on")}
+$("#dlg").addEventListener("click",e=>{if(e.target.id==="dlg")closeDlg()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDlg()});
+load();
+</script>
+</body>
+</html>
