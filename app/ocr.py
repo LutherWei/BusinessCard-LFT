@@ -35,12 +35,15 @@ def rec_medium():
                             "Rec.model_type": ModelType.MEDIUM})._load_rec_model()
 
 
+RERECOG_BELOW = 0.98  # small 模型信心低於此值才用 medium 重認（實測真正的字修正都 < 0.86；≥0.98 只差在電話號碼的空白）
+
+
 def _rerecognize(img, lines):
-    """用較大的模型重認每一行；兩個模型結果相同（忽略空白）時保留有空白的版本，不同時取信心高的。"""
+    """用較大的模型重認「信心不夠」的行；兩個模型結果相同（忽略空白）時保留有空白的版本，不同時取信心高的。"""
     from rapidocr.ch_ppocr_rec.typings import TextRecInput
     from rapidocr.utils.process_img import get_rotate_crop_image
 
-    todo = [l for l in lines if not _is_noise(l)]
+    todo = [l for l in lines if not _is_noise(l) and l["score"] < RERECOG_BELOW]
     if not todo:
         return lines
     crops = [get_rotate_crop_image(img, np.array(l["box"], np.float32)) for l in todo]
@@ -66,53 +69,16 @@ def engine_nocls():
     return RapidOCR(params={"Global.log_level": "warning", "Global.use_cls": False})
 
 
+WORK_SIDE = 2016  # 辨識用的長邊（iPhone 原圖 4032 的一半）
+
+
 def load_image(data: bytes) -> np.ndarray:
-    img = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
-    img.thumbnail((2400, 2400))
+    img = Image.open(io.BytesIO(data))
+    if max(img.size) >= 2 * WORK_SIDE:  # 手機原圖（4032px）：JPEG 解碼時直接縮成一半（比解完整張再縮快很多）
+        img.draft("RGB", (img.size[0] // 2, img.size[1] // 2))
+    img = ImageOps.exif_transpose(img).convert("RGB")
+    img.thumbnail((WORK_SIDE, WORK_SIDE))
     return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-
-
-def _order(pts):
-    s, d = pts.sum(1), np.diff(pts, axis=1).ravel()
-    return np.array([pts[s.argmin()], pts[d.argmin()], pts[s.argmax()], pts[d.argmax()]], dtype=np.float32)
-
-
-def crop_card(img: np.ndarray):
-    """找出畫面中最大的亮色四邊形（名片）並做透視校正；找不到就回傳原圖。"""
-    h, w = img.shape[:2]
-    gray = cv2.GaussianBlur(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), (7, 7), 0)
-    best = None
-    for th in (cv2.THRESH_OTSU, None):
-        if th is None:
-            mask = cv2.dilate(cv2.Canny(gray, 40, 120), np.ones((5, 5), np.uint8), iterations=2)
-        else:
-            _, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | th)
-            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
-        cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for c in sorted(cnts, key=cv2.contourArea, reverse=True)[:5]:
-            area = cv2.contourArea(c)
-            if area < 0.12 * h * w or area > 0.97 * h * w:
-                continue
-            hull = cv2.convexHull(c)
-            approx = cv2.approxPolyDP(hull, 0.02 * cv2.arcLength(hull, True), True)
-            if len(approx) != 4:
-                rect = cv2.minAreaRect(hull)
-                approx = cv2.boxPoints(rect).reshape(-1, 1, 2)
-                if area / max(rect[1][0] * rect[1][1], 1) < 0.85:
-                    continue
-            if best is None or area > best[0]:
-                best = (area, approx.reshape(4, 2).astype(np.float32))
-        if best:
-            break
-    if not best:
-        return img, False
-    src = _order(best[1])
-    wd = int(max(np.linalg.norm(src[0] - src[1]), np.linalg.norm(src[3] - src[2])))
-    ht = int(max(np.linalg.norm(src[0] - src[3]), np.linalg.norm(src[1] - src[2])))
-    if wd < 200 or ht < 120:
-        return img, False
-    dst = np.array([[0, 0], [wd, 0], [wd, ht], [0, ht]], dtype=np.float32)
-    return cv2.warpPerspective(img, cv2.getPerspectiveTransform(src, dst), (wd, ht)), True
 
 
 def _geom(ln):
@@ -184,6 +150,9 @@ def _weight(lines, tall):
     return sum(l["score"] * len(l["text"]) for l in lines if len(l["text"]) >= 3 and _is_tall(l) == tall)
 
 
+ORIENT_SIDE = 1280  # 判斷方向用的縮圖長邊
+
+
 def _fix_orientation(img, lines):
     """名片被直拿著拍（文字轉了 90 度）時，大部分文字框會是直的 → 把圖轉正再 OCR 一次。
     但直書名片（陳志明 律師）本來就是直的：轉了反而認不出來，分數比較低就保留原圖。
@@ -191,15 +160,17 @@ def _fix_orientation(img, lines):
     tall_w = _weight(lines, True)
     if tall_w <= _weight(lines, False):
         return img, lines, False
+    s = min(1.0, ORIENT_SIDE / max(img.shape[:2]))  # 判斷方向只要比分數，用縮小圖就夠（快很多）
+    small = cv2.resize(img, None, fx=s, fy=s, interpolation=cv2.INTER_AREA) if s < 1 else img
     best, best_w = None, -1
     for rot in (cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE):
-        r = cv2.rotate(img, rot)
-        w = _weight(_ocr(r, engine_nocls()), False)  # 不自動翻轉 → 轉錯方向（上下顛倒）會得低分
+        w = _weight(_ocr(cv2.rotate(small, rot), engine_nocls()), False)  # 不自動翻轉 → 轉錯方向會得低分
         if w > best_w:
-            best, best_w = r, w
-    if best_w < 0.8 * _weight(_ocr(img, engine_nocls()), True):  # 直書名片
+            best, best_w = rot, w
+    if best_w < 0.8 * tall_w:  # 直書名片：轉了反而比原本的直排字分數低（沿用第一次 OCR 的分數，不再多跑一次）
         return img, lines, True
-    return best, _ocr(best), False
+    img = cv2.rotate(img, best)
+    return img, _ocr(img), False
 
 
 def _fix_upside_down(img, lines):

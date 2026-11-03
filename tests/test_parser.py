@@ -258,3 +258,13 @@ def test_sheet_cut_avoids_text():
     assert 480 < _best_cut(spans, 300, 700, 500, 1000) < 520
     spans = [(0, 560, 20), (600, 1000, 20)]           # 名片沒擺正：空隙偏右
     assert 560 < _best_cut(spans, 300, 700, 500, 1000) < 600
+
+
+# ---- 標籤（自由索引）----
+def test_normalize_tags():
+    from app.db import normalize_tags, tag_list
+    assert normalize_tags(["金融業，客戶、台北"]) == "金融業，客戶、台北"     # 輸入的整串就是一個標籤，不自動拆開
+    assert normalize_tags(["A,B"]) == "A，B"                                 # 半形逗號（儲存分隔）轉全形
+    assert normalize_tags(["金融業", " 餐廳 ", "金融業", " "]) == "金融業,餐廳"  # 去空白、去重
+    assert normalize_tags("金融業,餐廳") == "金融業,餐廳"                      # 資料庫格式
+    assert tag_list("金融業,餐廳") == ["金融業", "餐廳"] and tag_list("") == []

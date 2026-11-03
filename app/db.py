@@ -1,5 +1,6 @@
 """SQLite 儲存：cards 表 + 簡易關鍵字檢索。"""
 import json
+import re
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -78,7 +79,26 @@ def set_back(card_id, back_raw, back_image, back_card_image):
                   (json.dumps(back_raw, ensure_ascii=False), back_image, back_card_image, card_id))
 
 
+def normalize_tags(tags) -> str:
+    """標籤（自由索引）→ 存成「金融業,餐廳」。
+    - list：每一項就是一個標籤，不再拆開；標籤裡的半形逗號（儲存用的分隔）轉成全形「，」。
+    - 字串：資料庫存的格式，只用半形逗號分隔。
+    去頭尾空白、去重。"""
+    items = [str(t).replace(",", "，") for t in tags] if isinstance(tags, (list, tuple)) else (tags or "").split(",")
+    out = []
+    for t in items:
+        t = t.strip()
+        if t and t not in out:
+            out.append(t)
+    return ",".join(out)
+
+
+def tag_list(tags: str):
+    return [t for t in (tags or "").split(",") if t]
+
+
 def update(card_id, data, tags="", note="", potential=""):
+    tags = normalize_tags(tags)
     now = datetime.now().isoformat(timespec="seconds")
     with conn() as c:
         c.execute(
@@ -103,8 +123,10 @@ def delete(card_id):
         return r
 
 
-def search(q="", company="", potential=None, limit=200, date_from="", date_to="", sort="new"):
-    """q 以空白分隔多個關鍵字，全部命中才回傳（AND）。"""
+def search(q="", company="", potential=None, limit=200, date_from="", date_to="", sort="new", tags=None,
+           tag_mode="all"):
+    """q 以空白分隔多個關鍵字，全部命中才回傳（AND）。
+    tags：自由索引標籤，多個時要全部都有（AND）；完全比對（「金融業」不會命中「非金融業」）；"__none__" = 尚未加標籤。"""
     sql, args = "SELECT * FROM cards WHERE 1=1", []
     for kw in q.lower().split():
         kw_digits = "".join(ch for ch in kw if ch.isdigit())
@@ -118,6 +140,15 @@ def search(q="", company="", potential=None, limit=200, date_from="", date_to=""
     if potential is not None:  # "" = 未評估
         sql += " AND COALESCE(potential,'')=?"
         args.append(potential)
+    conds = []
+    for t in tags or []:
+        if t == "__none__":
+            conds.append("COALESCE(tags,'')=''")
+        else:
+            conds.append("(',' || COALESCE(tags,'') || ',') LIKE ?")
+            args.append(f"%,{t},%")
+    if conds:  # all：全部標籤都要有；any：有其中一個就好
+        sql += " AND (" + (" OR " if tag_mode == "any" else " AND ").join(conds) + ")"
     if date_from:  # 上傳日期區間（YYYY-MM-DD，含頭尾）
         sql += " AND substr(created_at,1,10) >= ?"
         args.append(date_from)
@@ -142,3 +173,31 @@ def potentials():
     with conn() as c:
         return {r["p"]: r["n"] for r in c.execute(
             "SELECT COALESCE(potential,'') AS p, COUNT(*) AS n FROM cards GROUP BY p")}
+
+
+def all_tags():
+    """所有標籤與名片數（自由索引列表），多的排前面。"""
+    from collections import Counter
+
+    cnt, none = Counter(), 0
+    with conn() as c:
+        for (t,) in c.execute("SELECT COALESCE(tags,'') FROM cards"):
+            lst = tag_list(t)
+            cnt.update(lst)
+            none += not lst
+    return {"tags": [{"tag": k, "n": n} for k, n in sorted(cnt.items(), key=lambda x: (-x[1], x[0]))], "none": none}
+
+
+def bulk_tags(ids, add=(), remove=()):
+    """批次加 / 移除標籤（不動其他欄位，但會更新搜尋文字讓關鍵字也搜得到標籤）。"""
+    add, remove = tag_list(normalize_tags(list(add))), set(tag_list(normalize_tags(list(remove))))  # 每一項是一個標籤
+    now = datetime.now().isoformat(timespec="seconds")
+    with conn() as c:
+        for cid in ids:
+            r = c.execute("SELECT data, tags, note FROM cards WHERE id=?", (cid,)).fetchone()
+            if not r:
+                continue
+            tags = normalize_tags([t for t in tag_list(r["tags"]) if t not in remove] + add)
+            c.execute("UPDATE cards SET tags=?, updated_at=?, search=? WHERE id=?",
+                      (tags, now, _search_text(json.loads(r["data"]), tags, r["note"] or ""), cid))
+    return len(ids)
